@@ -18,7 +18,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $filePath = $_POST['filePath'];
     $emails = isset($_POST['emails']) ? $_POST['emails'] : [];
 
-    if (!empty($filePath) && !empty($emails)) {
+    if (!empty($filePath) && !empty($emails) && file_exists($filePath)) {
+        // Obtener el nombre del archivo
+        $fileName = basename($filePath);
+
+        if (!$fileName) {
+            echo "Error: El nombre del archivo no se pudo determinar.";
+            exit;
+        }
+
         // Configuración de PHPMailer
         $mail = new PHPMailer(true); // Habilitar excepciones
         try {
@@ -38,33 +46,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mail->setFrom('info@zfseguretat.es', 'ZF Seguretat'); // Dirección y nombre del remitente
 
             // Contenido del correo
-            $subject = "Aquí está tu archivo PDF";
-            $body = "Adjunto encontrarás el archivo PDF.";
+            $subject = "Envio de informe: " . $fileName;
+            $body = "Adjunto encontrarás el archivo PDF del informe: " . $fileName;
             $mail->isHTML(true); // Establecer formato HTML
             $mail->Subject = $subject; // Asunto del correo
             $mail->Body = $body; // Cuerpo del correo
 
             // Adjuntar archivo PDF
             $pdf_content = file_get_contents($filePath); // Obtener contenido del archivo PDF
-            $fileName = basename($filePath);
+            if ($pdf_content === false) {
+                throw new Exception("Error al leer el archivo PDF.");
+            }
             $mail->addStringAttachment($pdf_content, $fileName, 'base64', 'application/pdf');
 
             // Enviar correo a cada destinatario
             foreach ($emails as $email) {
-                $mail->addAddress($email); // Agregar destinatario
-                $mail->send(); // Enviar correo
-                $mail->clearAddresses(); // Limpiar destinatarios para el siguiente ciclo
+                if ($email) { // Validar email antes de agregarlo
+                    $mail->addAddress($email); // Agregar destinatario
+                    $mail->send(); // Enviar correo
+                    $mail->clearAddresses(); // Limpiar destinatarios para el siguiente ciclo
+                }
             }
             echo 'Correos enviados exitosamente';
         } catch (Exception $e) {
-            echo "Error al enviar el correo: {$mail->ErrorInfo}";
+            echo "Error al enviar el correo: " . htmlspecialchars($mail->ErrorInfo);
         }
     } else {
-        echo "No se proporcionó ningún archivo o email.";
+        if (empty($filePath)) {
+            echo "Error: No se proporcionó el archivo.";
+        } elseif (empty($emails)) {
+            echo "Error: No se proporcionó una lista de correos.";
+        } elseif (!file_exists($filePath)) {
+            echo "Error: El archivo no existe.";
+        } else {
+            echo "Error desconocido.";
+        }
     }
 } else {
     echo "Método de solicitud no válido.";
 }
 ?>
-
-
